@@ -44,11 +44,15 @@ done
 
 # Install GPG key
 topic "Install gpg key for Datadog APT Repository"
+APT_KEYBOX="$CACHE_DIR/apt/temp.gpg"
 APT_KEYRING="$CACHE_DIR/apt/trusted.gpg"
 GPG_KEY_FILE="$BUILDPACK_DIR/etc/datadog.gpg"
 GPG_HOME_DIR="$BUILD_DIR/.gnupg"
 mkdir -p "$GPG_HOME_DIR"
-gpg --ignore-time-conflict --no-options --no-default-keyring --homedir "$GPG_HOME_DIR" --keyring "$APT_KEYRING" --import "$GPG_KEY_FILE" | indent
+gpg --ignore-time-conflict --no-options --no-default-keyring --homedir "$GPG_HOME_DIR" --keyring "$APT_KEYBOX" --import "$GPG_KEY_FILE" | indent
+# Transform keyring from the keybox format (not accepted by apt) to the binary OpenGPG one
+topic "Transform keybox into keyring"
+gpg --no-default-keyring --keyring "$APT_KEYBOX" --export > $APT_KEYRING
 
 # Install Datadog Agent
 topic "Updating apt caches for Datadog Agent"
