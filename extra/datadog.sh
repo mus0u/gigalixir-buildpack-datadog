@@ -42,14 +42,12 @@ for file in "$APP_DATADOG_CONF_DIR"/*.yaml; do
   cp "$file" "$DD_CONF_DIR/conf.d/${filename}.d/conf.yaml"
 done
 
+PSHOST=$(hostname )
 # Add tags to the config file
-DYNOHOST="$(hostname )"
-DYNOTYPE=${DYNO%%.*}
-BUILDPACKVERSION="dev"
-DYNO_TAGS="dyno:$DYNO dynotype:$DYNOTYPE buildpackversion:$BUILDPACKVERSION"
+TAGS="tags:\n  - procid:${PSHOST}"
 
-if [ -n "$HEROKU_APP_NAME" ]; then
-  DYNO_TAGS="$DYNO_TAGS appname:$HEROKU_APP_NAME"
+if [ -n "$APP_NAME" ]; then
+  TAGS="$TAGS\n  - appname:$APP_NAME"
 fi
 
 # Uncomment APM configs and add the log file location.
@@ -73,25 +71,26 @@ fi
 # https://github.com/DataDog/datadog-agent/blob/master/pkg/config/config.go#L145
 
 if [ -z "$DD_API_KEY" ]; then
-  echo "DD_API_KEY environment variable not set. Run: heroku config:add DD_API_KEY=<your API key>"
+  echo "DD_API_KEY environment variable not set. Run: gigalixir config:set DD_API_KEY=<your API key>"
   DISABLE_DATADOG_AGENT=1
 fi
 
 if [ -z "$DD_HOSTNAME" ]; then
   if [ "$DD_DYNO_HOST" == "true" ]; then
     # Set the hostname to dyno name and ensure rfc1123 compliance.
-    HAN="$(echo "$HEROKU_APP_NAME" | sed -e 's/[^a-zA-Z0-9-]/-/g' -e 's/^-//g')"
-    if [ "$HAN" != "$HEROKU_APP_NAME" ]; then
+    AN="$(echo "$APP_NAME" | sed -e 's/[^a-zA-Z0-9-]/-/g' -e 's/^-//g')"
+    if [ "$AN" != "$APP_NAME" ]; then
       if [ "$DD_LOG_LEVEL_LOWER" == "debug" ]; then
-        echo "WARNING: The appname \"$HEROKU_APP_NAME\" contains invalid characters. Using \"$HAN\" instead."
+        echo "WARNING: The appname \"$APP_NAME\" contains invalid characters. Using \"$AN\" instead."
       fi
     fi
 
-    D="$(echo "$DYNO" | sed -e 's/[^a-zA-Z0-9.-]/-/g' -e 's/^-//g')"
-    export DD_HOSTNAME="$HAN.$D"
+    R=$HOST_INDEX
+
+    export DD_HOSTNAME="$AN.$R"
   else
     # Set the hostname to the dyno host
-    DD_HOSTNAME="$(echo "$DYNOHOST" | sed -e 's/[^a-zA-Z0-9-]/-/g' -e 's/^-//g')"
+    DD_HOSTNAME="$(echo "$PSHOST" | sed -e 's/[^a-zA-Z0-9-]/-/g' -e 's/^-//g')"
     export DD_HOSTNAME
   fi
 else
@@ -155,9 +154,9 @@ fi
 # Convert comma delimited tags from env vars to yaml
 if [ -n "$DD_TAGS" ]; then
   DD_TAGS_NORMALIZED="$(sed "s/,[ ]\?/\ /g"  <<< "$DD_TAGS")"
-  DD_TAGS="$DYNO_TAGS $DD_TAGS_NORMALIZED"
+  DD_TAGS="$TAGS $DD_TAGS_NORMALIZED"
 else
-  DD_TAGS="$DYNO_TAGS"
+  DD_TAGS="$TAGS"
 fi
 
 export DD_TAGS="$DD_TAGS"
